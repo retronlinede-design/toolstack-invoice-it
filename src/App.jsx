@@ -1,20 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-// ToolStack Invoice-It — simple invoicing tool (free)
-// Match Budgit UI (light theme):
-// - bg-neutral-50 page, white cards, neutral borders
-// - SmallButton component
-// - Print Preview modal (prints ONLY preview sheet)
-// - Export/Import JSON + Export CSV
+/**
+ * ToolStack — Invoice-It (Styled to match Check-It master)
+ * - bg-neutral-50 page, white cards, neutral borders
+ * - Normalized Top Actions grid + pinned ? Help (Help Pack v1)
+ * - Print Preview modal (prints ONLY invoice sheet)
+ * - Export/Import JSON + Export CSV
+ * - Autosave to localStorage
+ */
 
 const LS_KEY = "toolstack_invoiceit_v1";
 
 const uid = () => {
   try {
     if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-  } catch {
-    // ignore
-  }
+  } catch {}
   return `id_${Math.random().toString(16).slice(2)}_${Date.now()}`;
 };
 
@@ -49,31 +49,149 @@ const money = (value, currency = "EUR") => {
   try {
     return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(v);
   } catch {
-    // fallback
     const sign = v < 0 ? "-" : "";
     const abs = Math.abs(v);
     return `${sign}${currency} ${abs.toFixed(2)}`;
   }
 };
 
-function SmallButton({ children, onClick, tone = "default", className = "", disabled, title, type }) {
-  const cls =
-    tone === "primary"
-      ? "bg-neutral-900 hover:bg-neutral-800 text-white border-neutral-900 shadow-sm"
-      : tone === "danger"
-        ? "bg-red-50 hover:bg-red-100 text-red-700 border-red-200 shadow-sm"
-        : "bg-white hover:bg-neutral-50 text-neutral-900 border-neutral-200 shadow-sm";
+/** Master UI primitives (Check-It) */
+const btnSecondary =
+  "print:hidden px-3 py-2 rounded-xl text-sm font-medium border border-neutral-200 bg-white shadow-sm hover:bg-neutral-50 active:translate-y-[1px] transition disabled:opacity-50 disabled:cursor-not-allowed";
+const btnPrimary =
+  "print:hidden px-3 py-2 rounded-xl text-sm font-medium border border-neutral-700 bg-neutral-700 text-white shadow-sm hover:bg-neutral-600 active:translate-y-[1px] transition disabled:opacity-50 disabled:cursor-not-allowed";
+const btnDanger =
+  "print:hidden px-3 py-2 rounded-xl text-sm font-medium border border-red-200 bg-red-50 text-red-700 shadow-sm hover:bg-red-100 active:translate-y-[1px] transition disabled:opacity-50 disabled:cursor-not-allowed";
 
+const inputBase =
+  "w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-lime-400/25 focus:border-neutral-300";
+
+const card = "rounded-2xl bg-white border border-neutral-200 shadow-sm";
+const cardHead = "px-4 py-3 border-b border-neutral-100";
+const cardPad = "p-4";
+
+function SmallButton({ children, onClick, tone = "default", className = "", disabled, title, type }) {
+  const cls = tone === "primary" ? btnPrimary : tone === "danger" ? btnDanger : btnSecondary;
   return (
     <button
       type={type || "button"}
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`print:hidden px-3 py-2 rounded-xl text-sm font-medium border transition active:translate-y-[1px] disabled:opacity-50 disabled:cursor-not-allowed ${cls} ${className}`}
+      className={`${cls} ${className}`}
     >
       {children}
     </button>
+  );
+}
+
+/** Normalized Top Actions (mobile-aligned grid) */
+const ACTION_BASE =
+  "print:hidden h-10 w-full rounded-xl text-sm font-medium border transition shadow-sm active:translate-y-[1px] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center";
+
+function ActionButton({ children, onClick, tone = "default", disabled, title }) {
+  const cls =
+    tone === "primary"
+      ? "bg-neutral-700 hover:bg-neutral-600 text-white border-neutral-700"
+      : "bg-white hover:bg-neutral-50 text-neutral-700 border-neutral-200";
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} title={title} className={`${ACTION_BASE} ${cls}`}>
+      {children}
+    </button>
+  );
+}
+
+function ActionFileButton({ children, onFile, accept = "application/json", tone = "primary", title }) {
+  const cls =
+    tone === "primary"
+      ? "bg-neutral-700 hover:bg-neutral-600 text-white border-neutral-700"
+      : "bg-white hover:bg-neutral-50 text-neutral-700 border-neutral-200";
+
+  return (
+    <label title={title} className={`${ACTION_BASE} ${cls} cursor-pointer`}>
+      <span>{children}</span>
+      <input
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(e) => onFile?.(e.target.files?.[0] || null)}
+      />
+    </label>
+  );
+}
+
+/** Help Pack v1 (modal) */
+function HelpModal({ open, onClose }) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-2xl rounded-2xl bg-white border border-neutral-200 shadow-xl overflow-hidden">
+        <div className="p-4 border-b border-neutral-100 flex items-start justify-between gap-4">
+          <div>
+            <div className="text-lg font-semibold text-neutral-800">Help</div>
+            <div className="text-sm text-neutral-700 mt-1">How saving works in ToolStack apps.</div>
+            <div className="mt-3 h-[2px] w-52 rounded-full bg-gradient-to-r from-lime-400/0 via-lime-400 to-emerald-400/0" />
+          </div>
+          <button
+            type="button"
+            className="px-3 py-2 rounded-xl text-sm font-medium border border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-800 transition"
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4 text-sm text-neutral-700">
+          <div className="rounded-2xl border border-neutral-200 p-4">
+            <div className="font-semibold text-neutral-800">Autosave (default)</div>
+            <p className="mt-1 text-neutral-700">
+              Your data saves automatically in this browser on this device (localStorage). If you clear browser data or
+              switch devices, it won’t follow automatically.
+            </p>
+            <div className="mt-2 text-xs text-neutral-600">
+              Storage key: <span className="font-mono">{LS_KEY}</span>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-neutral-200 p-4">
+            <div className="font-semibold text-neutral-800">Export (backup / move devices)</div>
+            <p className="mt-1 text-neutral-700">
+              Use <span className="font-medium">Export</span> to download a JSON backup file. Save it somewhere safe
+              (Drive/Dropbox/email to yourself).
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-neutral-200 p-4">
+            <div className="font-semibold text-neutral-800">Import (restore)</div>
+            <p className="mt-1 text-neutral-700">
+              Use <span className="font-medium">Import</span> to load a previous JSON backup and continue.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-neutral-200 p-4">
+            <div className="font-semibold text-neutral-800">Printing invoices</div>
+            <p className="mt-1 text-neutral-700">
+              Use <span className="font-medium">Preview</span> first, then <span className="font-medium">Print / Save PDF</span>.
+              This prints only the invoice sheet.
+            </p>
+          </div>
+
+          <div className="text-xs text-neutral-600">Tip: Export once a week (or after big updates) so you always have a clean backup.</div>
+        </div>
+
+        <div className="p-4 border-t border-neutral-100 flex items-center justify-end">
+          <button
+            type="button"
+            className="px-3 py-2 rounded-xl text-sm font-medium border border-neutral-700 bg-neutral-700 text-white hover:bg-neutral-600 transition"
+            onClick={onClose}
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -119,7 +237,6 @@ function normalizeData(raw) {
   d.clients = Array.isArray(d.clients) ? d.clients : [];
   d.invoices = Array.isArray(d.invoices) ? d.invoices : [];
 
-  // ensure invoice shape
   d.invoices = d.invoices.map((inv) => ({
     id: inv.id || uid(),
     invoiceNumber: inv.invoiceNumber || "",
@@ -156,6 +273,8 @@ function normalizeData(raw) {
 export default function InvoiceItApp() {
   const fileRef = useRef(null);
   const toastTimer = useRef(null);
+
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const [app, setApp] = useState(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem(LS_KEY) : null;
@@ -258,18 +377,7 @@ export default function InvoiceItApp() {
   };
 
   const exportCSV = () => {
-    const header = [
-      "invoiceNumber",
-      "issueDate",
-      "dueDate",
-      "client",
-      "status",
-      "net",
-      "vatRate",
-      "vat",
-      "gross",
-      "currency",
-    ];
+    const header = ["invoiceNumber", "issueDate", "dueDate", "client", "status", "net", "vatRate", "vat", "gross", "currency"];
 
     const rows = app.invoices
       .slice()
@@ -332,6 +440,7 @@ export default function InvoiceItApp() {
         notes: "",
       };
 
+      // UI open
       setActiveInvoiceId(inv.id);
       setInvoiceModalOpen(true);
 
@@ -409,9 +518,17 @@ export default function InvoiceItApp() {
     notify("Client deleted");
   };
 
-  // Print CSS like Budgit
+  /** Print/Save PDF should print ONLY invoice sheet -> open preview then print */
+  const printInvoicePDF = () => {
+    if (!activeInvoice) return;
+    setPreviewOpen(true);
+    // small delay so CSS kicks in
+    setTimeout(() => window.print(), 80);
+  };
+
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900">
+    <div className="min-h-screen bg-neutral-50 text-neutral-800">
+      {/* Print rules */}
       <style>{`
         @media print {
           body { background: white !important; }
@@ -433,31 +550,27 @@ export default function InvoiceItApp() {
         `}</style>
       ) : null}
 
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+
       {/* Print Preview Modal */}
       {previewOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
           <div className="absolute inset-0 bg-black/40" onClick={() => setPreviewOpen(false)} />
 
-          <div className="relative w-full max-w-4xl">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div className="text-lg font-semibold text-white">Print preview</div>
+          <div className="relative w-full max-w-5xl">
+            <div className="mb-3 rounded-2xl bg-white border border-neutral-200 shadow-sm p-3 flex items-center justify-between gap-3">
+              <div className="text-lg font-semibold text-neutral-800">Print preview</div>
               <div className="flex items-center gap-2">
-                <button
-                  className="px-3 py-2 rounded-xl text-sm font-medium border border-white/40 bg-white/10 hover:bg-white/15 text-white transition"
-                  onClick={() => window.print()}
-                >
+                <button className={btnSecondary} onClick={() => window.print()}>
                   Print / Save PDF
                 </button>
-                <button
-                  className="px-3 py-2 rounded-xl text-sm font-medium border border-white/40 bg-white/10 hover:bg-white/15 text-white transition"
-                  onClick={() => setPreviewOpen(false)}
-                >
+                <button className={btnPrimary} onClick={() => setPreviewOpen(false)}>
                   Close
                 </button>
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white border border-neutral-200 shadow-lg overflow-auto max-h-[80vh]">
+            <div className="rounded-2xl bg-white border border-neutral-200 shadow-xl overflow-auto max-h-[80vh]">
               <div id="invoice-print-preview" className="p-6">
                 {activeInvoice ? (
                   <InvoiceSheet
@@ -475,52 +588,85 @@ export default function InvoiceItApp() {
         </div>
       ) : null}
 
-      <div className="max-w-5xl mx-auto px-4 py-6">
-        <div className="flex items-start justify-between gap-4">
+      <div className="max-w-6xl mx-auto p-4 sm:p-6">
+        {/* Header */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="text-2xl font-semibold text-neutral-900">Invoice-It</div>
-            <div className="text-sm text-neutral-600">
-              Simple invoicing • clients • invoices • preview • export/import
+            <div className="text-4xl sm:text-5xl font-black tracking-tight text-neutral-700">
+              <span>Invoice</span>
+              <span className="text-lime-500">It</span>
             </div>
+            <div className="text-sm text-neutral-700">Clients, invoices, preview, and exports.</div>
             <div className="mt-3 h-[2px] w-80 rounded-full bg-gradient-to-r from-lime-400/0 via-lime-400 to-emerald-400/0" />
           </div>
 
-          <div className="flex items-center gap-2">
-            <SmallButton onClick={() => setPreviewOpen(true)} disabled={!activeInvoice} title={!activeInvoice ? "Select an invoice first" : ""}>
-              Preview
-            </SmallButton>
-            <SmallButton onClick={() => window.print()}>Print / Save PDF</SmallButton>
-            <SmallButton onClick={exportCSV}>Export CSV</SmallButton>
-            <SmallButton onClick={exportJSON}>Export</SmallButton>
-            <label className="print:hidden px-3 py-2 rounded-xl text-sm font-medium border border-neutral-900 bg-neutral-900 text-white shadow-sm hover:bg-neutral-800 cursor-pointer active:translate-y-[1px]">
-              Import
-              <input
-                ref={fileRef}
-                type="file"
-                accept="application/json"
-                className="hidden"
-                onChange={(e) => importJSON(e.target.files?.[0] || null)}
-              />
-            </label>
-            <SmallButton tone="primary" onClick={createInvoice}>
-              + New invoice
-            </SmallButton>
-            <SmallButton onClick={() => { setEditingClientId("__new__"); setClientModalOpen(true); }}>
-              + Client
-            </SmallButton>
-            <SmallButton onClick={() => setSettingsOpen(true)}>Settings</SmallButton>
+          {/* Normalized Top Actions (Preview / Print / Export / Import) + pinned Help */}
+          <div className="w-full sm:w-[680px]">
+            <div className="relative">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 pr-12">
+                <ActionButton
+                  onClick={() => setPreviewOpen(true)}
+                  disabled={!activeInvoice}
+                  title={!activeInvoice ? "Select an invoice first" : ""}
+                >
+                  Preview
+                </ActionButton>
+                <ActionButton
+                  onClick={printInvoicePDF}
+                  disabled={!activeInvoice}
+                  title={!activeInvoice ? "Select an invoice first" : "Print only the invoice sheet"}
+                >
+                  Print / Save PDF
+                </ActionButton>
+                <ActionButton onClick={exportJSON}>Export</ActionButton>
+                <ActionFileButton
+                  onFile={(f) => importJSON(f)}
+                  tone="primary"
+                  title="Import a JSON backup"
+                >
+                  Import
+                </ActionFileButton>
+              </div>
+
+              <button
+                type="button"
+                title="Help"
+                onClick={() => setHelpOpen(true)}
+                className="print:hidden absolute right-0 top-0 h-10 w-10 rounded-xl border border-neutral-200 bg-white hover:bg-neutral-50 shadow-sm flex items-center justify-center font-bold text-neutral-800"
+                aria-label="Help"
+              >
+                ?
+              </button>
+            </div>
+
+            {/* App-specific quick actions (kept separate so Top Actions stays consistent) */}
+            <div className="mt-2 flex flex-wrap gap-2 justify-end">
+              <SmallButton onClick={exportCSV}>Export CSV</SmallButton>
+              <SmallButton tone="primary" onClick={createInvoice}>
+                + New invoice
+              </SmallButton>
+              <SmallButton
+                onClick={() => {
+                  setEditingClientId("__new__");
+                  setClientModalOpen(true);
+                }}
+              >
+                + Client
+              </SmallButton>
+              <SmallButton onClick={() => setSettingsOpen(true)}>Settings</SmallButton>
+            </div>
           </div>
         </div>
 
         {/* Totals row */}
         <div className="mt-5 grid grid-cols-1 md:grid-cols-4 gap-3">
           {(["Draft", "Sent", "Paid", "Overdue"]).map((s) => (
-            <div key={s} className="rounded-2xl bg-white shadow-sm border border-neutral-200 print:shadow-none">
-              <div className="px-4 py-3 border-b border-neutral-100">
-                <div className="font-semibold text-neutral-900">{s}</div>
+            <div key={s} className={`${card} print:shadow-none`}>
+              <div className={cardHead}>
+                <div className="font-semibold text-neutral-800">{s}</div>
               </div>
-              <div className="p-4">
-                <div className="text-2xl font-semibold text-neutral-900">{money(totalsByStatus[s], currency)}</div>
+              <div className={cardPad}>
+                <div className="text-2xl font-semibold text-neutral-800">{money(totalsByStatus[s], currency)}</div>
                 <div className="text-xs text-neutral-600 mt-1">Gross total</div>
               </div>
             </div>
@@ -529,40 +675,40 @@ export default function InvoiceItApp() {
 
         {/* Filters */}
         <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="rounded-2xl bg-white shadow-sm border border-neutral-200 print:shadow-none md:col-span-2">
-            <div className="px-4 py-3 border-b border-neutral-100 flex items-center justify-between gap-3">
-              <div className="font-semibold text-neutral-900">Search</div>
+          <div className={`${card} md:col-span-2`}>
+            <div className={`${cardHead} flex items-center justify-between gap-3`}>
+              <div className="font-semibold text-neutral-800">Search</div>
               <div className="text-sm text-neutral-600">{filteredInvoices.length} shown</div>
             </div>
-            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={`${cardPad} grid grid-cols-1 md:grid-cols-2 gap-3`}>
               <input
-                className="rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+                className={inputBase}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search invoices (client, number, items, notes…)"
               />
               <select
-                className="rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+                className={inputBase}
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
                 <option value="All">All statuses</option>
-                {STATUS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
+                {STATUS.map((st) => (
+                  <option key={st} value={st}>
+                    {st}
                   </option>
                 ))}
               </select>
             </div>
           </div>
 
-          <div className="rounded-2xl bg-white shadow-sm border border-neutral-200 print:shadow-none">
-            <div className="px-4 py-3 border-b border-neutral-100">
-              <div className="font-semibold text-neutral-900">Currency</div>
+          <div className={card}>
+            <div className={cardHead}>
+              <div className="font-semibold text-neutral-800">Currency</div>
             </div>
-            <div className="p-4">
+            <div className={cardPad}>
               <select
-                className="rounded-xl border border-neutral-200 px-3 py-2 bg-white w-full"
+                className={inputBase}
                 value={app.settings.currency}
                 onChange={(e) => setApp((a) => ({ ...a, settings: { ...a.settings, currency: e.target.value } }))}
               >
@@ -578,14 +724,20 @@ export default function InvoiceItApp() {
         {/* Main */}
         <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
           {/* Clients */}
-          <div className="rounded-2xl bg-white shadow-sm border border-neutral-200 print:shadow-none">
-            <div className="px-4 py-3 border-b border-neutral-100 flex items-center justify-between">
-              <div className="font-semibold text-neutral-900">Clients</div>
-              <SmallButton tone="primary" onClick={() => { setEditingClientId("__new__"); setClientModalOpen(true); }}>
+          <div className={card}>
+            <div className={`${cardHead} flex items-center justify-between`}>
+              <div className="font-semibold text-neutral-800">Clients</div>
+              <SmallButton
+                tone="primary"
+                onClick={() => {
+                  setEditingClientId("__new__");
+                  setClientModalOpen(true);
+                }}
+              >
                 + Add
               </SmallButton>
             </div>
-            <div className="p-4 space-y-2">
+            <div className={`${cardPad} space-y-2`}>
               {app.clients.length === 0 ? (
                 <div className="text-sm text-neutral-600">No clients yet.</div>
               ) : (
@@ -595,9 +747,9 @@ export default function InvoiceItApp() {
                   .map((c) => (
                     <div key={c.id} className="rounded-2xl border border-neutral-200">
                       <div className="px-3 py-2 border-b border-neutral-100 flex items-center justify-between">
-                        <div>
-                          <div className="font-semibold text-neutral-900">{c.name || "(unnamed)"}</div>
-                          <div className="text-xs text-neutral-600">{c.email || ""}</div>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-neutral-800 truncate">{c.name || "(unnamed)"}</div>
+                          <div className="text-xs text-neutral-600 truncate">{c.email || ""}</div>
                         </div>
                         <div className="text-xs text-neutral-600">
                           {app.invoices.filter((i) => i.clientId === c.id).length} inv
@@ -623,14 +775,12 @@ export default function InvoiceItApp() {
           </div>
 
           {/* Invoices list */}
-          <div className="md:col-span-2 rounded-2xl bg-white shadow-sm border border-neutral-200 print:shadow-none">
-            <div className="px-4 py-3 border-b border-neutral-100 flex items-center justify-between">
-              <div className="font-semibold text-neutral-900">Invoices</div>
-              <div className="flex items-center gap-2">
-                <SmallButton tone="primary" onClick={createInvoice}>
-                  + New
-                </SmallButton>
-              </div>
+          <div className="md:col-span-2 rounded-2xl bg-white shadow-sm border border-neutral-200">
+            <div className={`${cardHead} flex items-center justify-between`}>
+              <div className="font-semibold text-neutral-800">Invoices</div>
+              <SmallButton tone="primary" onClick={createInvoice}>
+                + New
+              </SmallButton>
             </div>
 
             <div className="p-4 overflow-auto">
@@ -656,43 +806,45 @@ export default function InvoiceItApp() {
                       return (
                         <tr key={inv.id} className={`border-t border-neutral-200 ${selected ? "bg-lime-50" : ""}`}>
                           <td className="px-3 py-2">
-                            <button
-                              className="text-left"
-                              onClick={() => setActiveInvoiceId(inv.id)}
-                              title="Select"
-                            >
-                              <div className="font-semibold text-neutral-900">{inv.invoiceNumber || "(no number)"}</div>
+                            <button className="text-left" onClick={() => setActiveInvoiceId(inv.id)} title="Select">
+                              <div className="font-semibold text-neutral-800">{inv.invoiceNumber || "(no number)"}</div>
                               <div className="text-xs text-neutral-600">VAT: {toNumber(inv.vatRate)}%</div>
                             </button>
                           </td>
                           <td className="px-3 py-2">
-                            <div className="font-medium text-neutral-900">{client?.name || "—"}</div>
+                            <div className="font-medium text-neutral-800">{client?.name || "—"}</div>
                             <div className="text-xs text-neutral-600">{client?.email || ""}</div>
                           </td>
                           <td className="px-3 py-2">
-                            <div className="text-xs text-neutral-600">Issue: <span className="text-neutral-900">{inv.issueDate}</span></div>
-                            <div className="text-xs text-neutral-600">Due: <span className="text-neutral-900">{inv.dueDate}</span></div>
+                            <div className="text-xs text-neutral-600">
+                              Issue: <span className="text-neutral-800">{inv.issueDate}</span>
+                            </div>
+                            <div className="text-xs text-neutral-600">
+                              Due: <span className="text-neutral-800">{inv.dueDate}</span>
+                            </div>
                           </td>
                           <td className="px-3 py-2">
                             <select
-                              className="rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+                              className={inputBase}
                               value={inv.status}
                               onChange={(e) => upsertInvoice({ id: inv.id, status: e.target.value })}
                             >
-                              {STATUS.map((s) => (
-                                <option key={s} value={s}>
-                                  {s}
+                              {STATUS.map((st) => (
+                                <option key={st} value={st}>
+                                  {st}
                                 </option>
                               ))}
                             </select>
                           </td>
                           <td className="px-3 py-2">
-                            <div className="font-semibold text-neutral-900">{money(t.gross, currency)}</div>
+                            <div className="font-semibold text-neutral-800">{money(t.gross, currency)}</div>
                             <div className="text-xs text-neutral-600">Net {money(t.net, currency)}</div>
                           </td>
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-2 justify-end">
-                              <SmallButton onClick={() => { setActiveInvoiceId(inv.id); setInvoiceModalOpen(true); }}>Edit</SmallButton>
+                              <SmallButton onClick={() => { setActiveInvoiceId(inv.id); setInvoiceModalOpen(true); }}>
+                                Edit
+                              </SmallButton>
                               <SmallButton onClick={() => duplicateInvoice(inv.id)}>Duplicate</SmallButton>
                               <SmallButton tone="danger" onClick={() => deleteInvoice(inv.id)}>Delete</SmallButton>
                             </div>
@@ -708,9 +860,9 @@ export default function InvoiceItApp() {
                 <div className="text-sm text-neutral-600">
                   {activeInvoice ? (
                     <>
-                      Selected: <span className="font-semibold text-neutral-900">{activeInvoice.invoiceNumber}</span>
+                      Selected: <span className="font-semibold text-neutral-800">{activeInvoice.invoiceNumber}</span>
                       {" · "}
-                      <span className="text-neutral-900">{clientsById.get(activeInvoice.clientId)?.name || "No client"}</span>
+                      <span className="text-neutral-800">{clientsById.get(activeInvoice.clientId)?.name || "No client"}</span>
                     </>
                   ) : (
                     "Select an invoice to preview."
@@ -730,7 +882,7 @@ export default function InvoiceItApp() {
         </div>
 
         {toast ? (
-          <div className="fixed bottom-6 right-6 rounded-2xl bg-neutral-900 text-white px-4 py-3 shadow-lg print:hidden">
+          <div className="fixed bottom-6 right-6 rounded-2xl bg-neutral-800 text-white px-4 py-3 shadow-xl print:hidden">
             <div className="text-sm">{toast}</div>
           </div>
         ) : null}
@@ -739,18 +891,14 @@ export default function InvoiceItApp() {
       {/* Settings modal */}
       {settingsOpen ? (
         <ModalLight title="Settings" onClose={() => setSettingsOpen(false)}>
-          <SettingsPanel
-            app={app}
-            setApp={setApp}
-            notify={notify}
-          />
+          <SettingsPanel app={app} setApp={setApp} notify={notify} />
         </ModalLight>
       ) : null}
 
       {/* Client modal */}
       {clientModalOpen ? (
         <ClientModal
-          open
+          open={clientModalOpen}
           onClose={() => setClientModalOpen(false)}
           clientId={editingClientId}
           clients={app.clients}
@@ -765,7 +913,7 @@ export default function InvoiceItApp() {
       {/* Invoice modal */}
       {invoiceModalOpen ? (
         <InvoiceModal
-          open
+          open={invoiceModalOpen}
           onClose={() => setInvoiceModalOpen(false)}
           invoice={activeInvoice}
           clients={app.clients}
@@ -787,18 +935,13 @@ function ModalLight({ title, onClose, children }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative w-full max-w-4xl">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div className="text-lg font-semibold text-white">{title}</div>
-          <div className="flex items-center gap-2">
-            <button
-              className="px-3 py-2 rounded-xl text-sm font-medium border border-white/40 bg-white/10 hover:bg-white/15 text-white transition"
-              onClick={onClose}
-            >
-              Close
-            </button>
-          </div>
+        <div className="mb-3 rounded-2xl bg-white border border-neutral-200 shadow-sm p-3 flex items-center justify-between gap-3">
+          <div className="text-lg font-semibold text-neutral-800">{title}</div>
+          <button className={btnSecondary} onClick={onClose}>
+            Close
+          </button>
         </div>
-        <div className="rounded-2xl bg-white border border-neutral-200 shadow-lg overflow-auto max-h-[80vh]">
+        <div className="rounded-2xl bg-white border border-neutral-200 shadow-xl overflow-auto max-h-[80vh]">
           <div className="p-6">{children}</div>
         </div>
       </div>
@@ -813,12 +956,12 @@ function SettingsPanel({ app, setApp, notify }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div className="rounded-2xl border border-neutral-200">
-        <div className="px-4 py-3 border-b border-neutral-100 font-semibold text-neutral-900">Invoice defaults</div>
+        <div className="px-4 py-3 border-b border-neutral-100 font-semibold text-neutral-800">Invoice defaults</div>
         <div className="p-4 space-y-3">
           <div>
             <div className="text-xs font-medium text-neutral-700">Invoice prefix</div>
             <input
-              className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+              className={`mt-1 ${inputBase}`}
               value={s.invoicePrefix}
               onChange={(e) => setApp((a) => ({ ...a, settings: { ...a.settings, invoicePrefix: e.target.value } }))}
             />
@@ -827,7 +970,7 @@ function SettingsPanel({ app, setApp, notify }) {
             <div className="text-xs font-medium text-neutral-700">Next invoice number</div>
             <input
               type="number"
-              className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+              className={`mt-1 ${inputBase}`}
               value={s.nextInvoiceNumber}
               onChange={(e) => setApp((a) => ({ ...a, settings: { ...a.settings, nextInvoiceNumber: toNumber(e.target.value) || 1 } }))}
             />
@@ -836,7 +979,7 @@ function SettingsPanel({ app, setApp, notify }) {
             <div className="text-xs font-medium text-neutral-700">Default VAT rate (%)</div>
             <input
               type="number"
-              className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+              className={`mt-1 ${inputBase}`}
               value={s.defaultVatRate}
               onChange={(e) => setApp((a) => ({ ...a, settings: { ...a.settings, defaultVatRate: toNumber(e.target.value) } }))}
             />
@@ -845,7 +988,7 @@ function SettingsPanel({ app, setApp, notify }) {
             <div className="text-xs font-medium text-neutral-700">Default due days</div>
             <input
               type="number"
-              className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+              className={`mt-1 ${inputBase}`}
               value={s.defaultDueDays}
               onChange={(e) => setApp((a) => ({ ...a, settings: { ...a.settings, defaultDueDays: toNumber(e.target.value) || 14 } }))}
             />
@@ -853,7 +996,7 @@ function SettingsPanel({ app, setApp, notify }) {
           <div>
             <div className="text-xs font-medium text-neutral-700">Currency</div>
             <select
-              className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+              className={`mt-1 ${inputBase}`}
               value={s.currency}
               onChange={(e) => setApp((a) => ({ ...a, settings: { ...a.settings, currency: e.target.value } }))}
             >
@@ -867,7 +1010,7 @@ function SettingsPanel({ app, setApp, notify }) {
       </div>
 
       <div className="rounded-2xl border border-neutral-200">
-        <div className="px-4 py-3 border-b border-neutral-100 font-semibold text-neutral-900">Business profile</div>
+        <div className="px-4 py-3 border-b border-neutral-100 font-semibold text-neutral-800">Business profile</div>
         <div className="p-4 space-y-3">
           <Field label="Business name" value={p.businessName} onChange={(v) => setApp((a) => ({ ...a, profile: { ...a.profile, businessName: v } }))} />
           <Field label="Email" value={p.email} onChange={(v) => setApp((a) => ({ ...a, profile: { ...a.profile, email: v } }))} />
@@ -885,14 +1028,7 @@ function SettingsPanel({ app, setApp, notify }) {
           <TextArea label="Footer notes" value={p.footerNotes} onChange={(v) => setApp((a) => ({ ...a, profile: { ...a.profile, footerNotes: v } }))} />
 
           <div className="pt-2">
-            <SmallButton
-              tone="primary"
-              onClick={() => {
-                notify("Saved");
-              }}
-            >
-              Save
-            </SmallButton>
+            <SmallButton tone="primary" onClick={() => notify("Saved")}>Save</SmallButton>
           </div>
         </div>
       </div>
@@ -905,7 +1041,7 @@ function Field({ label, value, onChange, placeholder }) {
     <label className="block">
       <div className="text-xs font-medium text-neutral-700">{label}</div>
       <input
-        className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+        className={`mt-1 ${inputBase}`}
         value={value || ""}
         onChange={(e) => onChange?.(e.target.value)}
         placeholder={placeholder || ""}
@@ -919,7 +1055,7 @@ function TextArea({ label, value, onChange, placeholder }) {
     <label className="block">
       <div className="text-xs font-medium text-neutral-700">{label}</div>
       <textarea
-        className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white min-h-[90px]"
+        className={`mt-1 ${inputBase} min-h-[90px]`}
         value={value || ""}
         onChange={(e) => onChange?.(e.target.value)}
         placeholder={placeholder || ""}
@@ -928,37 +1064,30 @@ function TextArea({ label, value, onChange, placeholder }) {
   );
 }
 
+/** FIXED: Hooks are always called; we only return null after hooks */
 function ClientModal({ open, onClose, clientId, clients, onSave }) {
-  if (!open) return null;
-  const existing = clients.find((c) => c.id === clientId) || null;
+  const existing = useMemo(() => clients.find((c) => c.id === clientId) || null, [clients, clientId]);
   const isNew = clientId === "__new__" || !existing;
 
-  const [draft, setDraft] = useState(() =>
-    existing || {
-      id: uid(),
-      name: "",
-      address: "",
-      email: "",
-      phone: "",
-      contact: "",
-      notes: "",
-    }
-  );
+  const makeBlank = () => ({
+    id: uid(),
+    name: "",
+    address: "",
+    email: "",
+    phone: "",
+    contact: "",
+    notes: "",
+  });
+
+  const [draft, setDraft] = useState(() => existing || makeBlank());
 
   useEffect(() => {
     if (!open) return;
-    setDraft(
-      existing || {
-        id: uid(),
-        name: "",
-        address: "",
-        email: "",
-        phone: "",
-        contact: "",
-        notes: "",
-      }
-    );
-  }, [open, clientId]);
+    setDraft(existing || makeBlank());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, clientId, existing?.id]);
+
+  if (!open) return null;
 
   return (
     <ModalLight title={isNew ? "New client" : "Edit client"} onClose={onClose}>
@@ -984,10 +1113,7 @@ function ClientModal({ open, onClose, clientId, clients, onSave }) {
             tone="primary"
             onClick={() => {
               if (!String(draft.name || "").trim()) return alert("Client name is required");
-              onSave?.({
-                ...draft,
-                name: String(draft.name || "").trim(),
-              });
+              onSave?.({ ...draft, name: String(draft.name || "").trim() });
             }}
           >
             Save
@@ -998,29 +1124,23 @@ function ClientModal({ open, onClose, clientId, clients, onSave }) {
   );
 }
 
+/** FIXED: Hooks always called; safe fallback when invoice is null */
 function InvoiceModal({ open, onClose, invoice, clients, currency, defaultVat, onSave }) {
-  if (!open) return null;
-  if (!invoice) {
-    return (
-      <ModalLight title="Invoice" onClose={onClose}>
-        <div className="text-sm text-neutral-600">No invoice selected.</div>
-      </ModalLight>
-    );
-  }
-
-  const [draft, setDraft] = useState(() => ({
-    ...invoice,
-    vatRate: toNumber(invoice.vatRate) || toNumber(defaultVat),
-    items: (invoice.items || []).map((it) => ({
-      ...it,
-      qty: toNumber(it.qty) || 0,
-      unitPrice: toNumber(it.unitPrice) || 0,
-    })),
-  }));
-
-  useEffect(() => {
-    if (!open) return;
-    setDraft({
+  const base = useMemo(() => {
+    if (!invoice) {
+      return {
+        id: "",
+        invoiceNumber: "",
+        issueDate: todayISO(),
+        dueDate: addDaysISO(todayISO(), 14),
+        clientId: "",
+        status: "Draft",
+        vatRate: toNumber(defaultVat),
+        items: [{ id: uid(), desc: "", qty: 1, unit: "", unitPrice: 0 }],
+        notes: "",
+      };
+    }
+    return {
       ...invoice,
       vatRate: toNumber(invoice.vatRate) || toNumber(defaultVat),
       items: (invoice.items || []).map((it) => ({
@@ -1028,8 +1148,25 @@ function InvoiceModal({ open, onClose, invoice, clients, currency, defaultVat, o
         qty: toNumber(it.qty) || 0,
         unitPrice: toNumber(it.unitPrice) || 0,
       })),
-    });
-  }, [open, invoice?.id]);
+    };
+  }, [invoice, defaultVat]);
+
+  const [draft, setDraft] = useState(() => base);
+
+  useEffect(() => {
+    if (!open) return;
+    setDraft(base);
+  }, [open, base]);
+
+  if (!open) return null;
+
+  if (!invoice) {
+    return (
+      <ModalLight title="Invoice" onClose={onClose}>
+        <div className="text-sm text-neutral-600">No invoice selected.</div>
+      </ModalLight>
+    );
+  }
 
   const totals = calcTotals(draft);
 
@@ -1056,16 +1193,17 @@ function InvoiceModal({ open, onClose, invoice, clients, currency, defaultVat, o
           <div className="text-xs font-medium text-neutral-700">Issue date</div>
           <input
             type="date"
-            className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+            className={`mt-1 ${inputBase}`}
             value={draft.issueDate || ""}
             onChange={(e) => setDraft((d) => ({ ...d, issueDate: e.target.value }))}
           />
         </label>
+
         <label className="block">
           <div className="text-xs font-medium text-neutral-700">Due date</div>
           <input
             type="date"
-            className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+            className={`mt-1 ${inputBase}`}
             value={draft.dueDate || ""}
             onChange={(e) => setDraft((d) => ({ ...d, dueDate: e.target.value }))}
           />
@@ -1074,7 +1212,7 @@ function InvoiceModal({ open, onClose, invoice, clients, currency, defaultVat, o
         <label className="block md:col-span-2">
           <div className="text-xs font-medium text-neutral-700">Client</div>
           <select
-            className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+            className={`mt-1 ${inputBase}`}
             value={draft.clientId || ""}
             onChange={(e) => setDraft((d) => ({ ...d, clientId: e.target.value }))}
           >
@@ -1093,7 +1231,7 @@ function InvoiceModal({ open, onClose, invoice, clients, currency, defaultVat, o
         <label className="block">
           <div className="text-xs font-medium text-neutral-700">Status</div>
           <select
-            className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+            className={`mt-1 ${inputBase}`}
             value={draft.status || "Draft"}
             onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value }))}
           >
@@ -1109,7 +1247,7 @@ function InvoiceModal({ open, onClose, invoice, clients, currency, defaultVat, o
           <div className="text-xs font-medium text-neutral-700">VAT rate (%)</div>
           <input
             type="number"
-            className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+            className={`mt-1 ${inputBase}`}
             value={draft.vatRate}
             onChange={(e) => setDraft((d) => ({ ...d, vatRate: e.target.value }))}
           />
@@ -1117,7 +1255,7 @@ function InvoiceModal({ open, onClose, invoice, clients, currency, defaultVat, o
 
         <div className="md:col-span-2 rounded-2xl border border-neutral-200">
           <div className="px-4 py-3 border-b border-neutral-100 flex items-center justify-between">
-            <div className="font-semibold text-neutral-900">Line items</div>
+            <div className="font-semibold text-neutral-800">Line items</div>
             <SmallButton tone="primary" onClick={addItem}>
               + Add item
             </SmallButton>
@@ -1149,7 +1287,7 @@ function InvoiceModal({ open, onClose, invoice, clients, currency, defaultVat, o
                       <tr key={it.id} className="border-t border-neutral-200">
                         <td className="px-3 py-2">
                           <input
-                            className="w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+                            className={inputBase}
                             value={it.desc || ""}
                             onChange={(e) => setItem(it.id, { desc: e.target.value })}
                             placeholder="Service / Product"
@@ -1158,14 +1296,14 @@ function InvoiceModal({ open, onClose, invoice, clients, currency, defaultVat, o
                         <td className="px-3 py-2">
                           <input
                             type="number"
-                            className="w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+                            className={inputBase}
                             value={it.qty ?? 0}
                             onChange={(e) => setItem(it.id, { qty: e.target.value })}
                           />
                         </td>
                         <td className="px-3 py-2">
                           <input
-                            className="w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+                            className={inputBase}
                             value={it.unit || ""}
                             onChange={(e) => setItem(it.id, { unit: e.target.value })}
                             placeholder="hrs / pcs"
@@ -1174,12 +1312,12 @@ function InvoiceModal({ open, onClose, invoice, clients, currency, defaultVat, o
                         <td className="px-3 py-2">
                           <input
                             type="number"
-                            className="w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white"
+                            className={inputBase}
                             value={it.unitPrice ?? 0}
                             onChange={(e) => setItem(it.id, { unitPrice: e.target.value })}
                           />
                         </td>
-                        <td className="px-3 py-2 font-semibold text-neutral-900">{money(line, currency)}</td>
+                        <td className="px-3 py-2 font-semibold text-neutral-800">{money(line, currency)}</td>
                         <td className="px-3 py-2">
                           <SmallButton tone="danger" onClick={() => delItem(it.id)}>
                             Remove
@@ -1196,10 +1334,10 @@ function InvoiceModal({ open, onClose, invoice, clients, currency, defaultVat, o
 
         <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="md:col-span-2 rounded-2xl border border-neutral-200">
-            <div className="px-4 py-3 border-b border-neutral-100 font-semibold text-neutral-900">Notes</div>
+            <div className="px-4 py-3 border-b border-neutral-100 font-semibold text-neutral-800">Notes</div>
             <div className="p-4">
               <textarea
-                className="w-full rounded-xl border border-neutral-200 px-3 py-2 bg-white min-h-[90px]"
+                className={`${inputBase} min-h-[90px]`}
                 value={draft.notes || ""}
                 onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
                 placeholder="Payment terms, reference, etc."
@@ -1208,19 +1346,19 @@ function InvoiceModal({ open, onClose, invoice, clients, currency, defaultVat, o
           </div>
 
           <div className="rounded-2xl border border-neutral-200">
-            <div className="px-4 py-3 border-b border-neutral-100 font-semibold text-neutral-900">Totals</div>
+            <div className="px-4 py-3 border-b border-neutral-100 font-semibold text-neutral-800">Totals</div>
             <div className="p-4 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-neutral-600">Net</div>
-                <div className="font-semibold text-neutral-900">{money(totals.net, currency)}</div>
+                <div className="font-semibold text-neutral-800">{money(totals.net, currency)}</div>
               </div>
               <div className="flex items-center justify-between">
                 <div className="text-sm text-neutral-600">VAT ({totals.vatRate}%)</div>
-                <div className="font-semibold text-neutral-900">{money(totals.vat, currency)}</div>
+                <div className="font-semibold text-neutral-800">{money(totals.vat, currency)}</div>
               </div>
               <div className="pt-2 mt-2 border-t border-neutral-200 flex items-center justify-between">
-                <div className="font-semibold text-neutral-900">Total</div>
-                <div className="text-lg font-semibold text-neutral-900">{money(totals.gross, currency)}</div>
+                <div className="font-semibold text-neutral-800">Total</div>
+                <div className="text-lg font-semibold text-neutral-800">{money(totals.gross, currency)}</div>
               </div>
             </div>
           </div>
@@ -1258,47 +1396,55 @@ function InvoiceSheet({ profile, invoice, client, currency }) {
     <div className="mx-auto max-w-3xl">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-2xl font-semibold text-neutral-900">Invoice</div>
-          <div className="text-sm text-neutral-600">Generated: {now}</div>
+          <div className="text-2xl font-bold tracking-tight text-neutral-800">Invoice</div>
+          <div className="text-sm text-neutral-700">Generated: {now}</div>
           <div className="mt-3 h-[2px] w-64 rounded-full bg-gradient-to-r from-lime-400/0 via-lime-400 to-emerald-400/0" />
         </div>
         <div className="rounded-2xl border border-neutral-200 p-4 text-sm">
           <div className="flex items-center justify-between gap-6">
             <span className="text-neutral-600">Invoice #</span>
-            <span className="font-semibold text-neutral-900">{invoice.invoiceNumber}</span>
+            <span className="font-semibold text-neutral-800">{invoice.invoiceNumber}</span>
           </div>
           <div className="flex items-center justify-between gap-6 mt-1">
             <span className="text-neutral-600">Issue</span>
-            <span className="font-semibold text-neutral-900">{invoice.issueDate}</span>
+            <span className="font-semibold text-neutral-800">{invoice.issueDate}</span>
           </div>
           <div className="flex items-center justify-between gap-6 mt-1">
             <span className="text-neutral-600">Due</span>
-            <span className="font-semibold text-neutral-900">{invoice.dueDate}</span>
+            <span className="font-semibold text-neutral-800">{invoice.dueDate}</span>
           </div>
           <div className="flex items-center justify-between gap-6 mt-1">
             <span className="text-neutral-600">Status</span>
-            <span className="font-semibold text-neutral-900">{invoice.status}</span>
+            <span className="font-semibold text-neutral-800">{invoice.status}</span>
           </div>
         </div>
       </div>
 
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="rounded-2xl border border-neutral-200">
-          <div className="px-4 py-3 border-b border-neutral-100 font-semibold text-neutral-900">From</div>
+          <div className="px-4 py-3 border-b border-neutral-100 font-semibold text-neutral-800">From</div>
           <div className="p-4 text-sm text-neutral-700">
-            <div className="font-semibold text-neutral-900">{profile.businessName || "Your Business"}</div>
+            <div className="font-semibold text-neutral-800">{profile.businessName || "Your Business"}</div>
             <div className="whitespace-pre-line">{profile.address || ""}</div>
             {profile.email ? <div>{profile.email}</div> : null}
             {profile.phone ? <div>{profile.phone}</div> : null}
-            {profile.taxId ? <div className="mt-2"><span className="font-semibold">Tax ID:</span> {profile.taxId}</div> : null}
-            {profile.vatId ? <div><span className="font-semibold">VAT ID:</span> {profile.vatId}</div> : null}
+            {profile.taxId ? (
+              <div className="mt-2">
+                <span className="font-semibold">Tax ID:</span> {profile.taxId}
+              </div>
+            ) : null}
+            {profile.vatId ? (
+              <div>
+                <span className="font-semibold">VAT ID:</span> {profile.vatId}
+              </div>
+            ) : null}
           </div>
         </div>
 
         <div className="rounded-2xl border border-neutral-200">
-          <div className="px-4 py-3 border-b border-neutral-100 font-semibold text-neutral-900">Bill To</div>
+          <div className="px-4 py-3 border-b border-neutral-100 font-semibold text-neutral-800">Bill To</div>
           <div className="p-4 text-sm text-neutral-700">
-            <div className="font-semibold text-neutral-900">{client?.name || "—"}</div>
+            <div className="font-semibold text-neutral-800">{client?.name || "—"}</div>
             <div className="whitespace-pre-line">{client?.address || ""}</div>
             {client?.email ? <div>{client.email}</div> : null}
             {client?.phone ? <div>{client.phone}</div> : null}
@@ -1326,7 +1472,7 @@ function InvoiceSheet({ profile, invoice, client, currency }) {
                   <td className="px-3 py-2">{toNumber(it.qty)}</td>
                   <td className="px-3 py-2">{it.unit || ""}</td>
                   <td className="px-3 py-2">{money(toNumber(it.unitPrice), currency)}</td>
-                  <td className="px-3 py-2 font-semibold text-neutral-900">{money(line, currency)}</td>
+                  <td className="px-3 py-2 font-semibold text-neutral-800">{money(line, currency)}</td>
                 </tr>
               );
             })}
@@ -1344,31 +1490,41 @@ function InvoiceSheet({ profile, invoice, client, currency }) {
         <div className="rounded-2xl border border-neutral-200 p-4 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-neutral-600">Net</span>
-            <span className="font-semibold text-neutral-900">{money(t.net, currency)}</span>
+            <span className="font-semibold text-neutral-800">{money(t.net, currency)}</span>
           </div>
           <div className="flex items-center justify-between mt-1">
             <span className="text-neutral-600">VAT ({t.vatRate}%)</span>
-            <span className="font-semibold text-neutral-900">{money(t.vat, currency)}</span>
+            <span className="font-semibold text-neutral-800">{money(t.vat, currency)}</span>
           </div>
           <div className="pt-3 mt-3 border-t border-neutral-200 flex items-center justify-between">
-            <span className="font-semibold text-neutral-900">Total</span>
-            <span className="text-lg font-semibold text-neutral-900">{money(t.gross, currency)}</span>
+            <span className="font-semibold text-neutral-800">Total</span>
+            <span className="text-lg font-semibold text-neutral-800">{money(t.gross, currency)}</span>
           </div>
 
-          {(profile.bank || profile.iban || profile.bic) ? (
+          {profile.bank || profile.iban || profile.bic ? (
             <div className="mt-4 text-neutral-700">
               <div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Payment</div>
-              {profile.bank ? <div><span className="font-semibold">Bank:</span> {profile.bank}</div> : null}
-              {profile.iban ? <div><span className="font-semibold">IBAN:</span> {profile.iban}</div> : null}
-              {profile.bic ? <div><span className="font-semibold">BIC:</span> {profile.bic}</div> : null}
+              {profile.bank ? (
+                <div>
+                  <span className="font-semibold">Bank:</span> {profile.bank}
+                </div>
+              ) : null}
+              {profile.iban ? (
+                <div>
+                  <span className="font-semibold">IBAN:</span> {profile.iban}
+                </div>
+              ) : null}
+              {profile.bic ? (
+                <div>
+                  <span className="font-semibold">BIC:</span> {profile.bic}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
       </div>
 
-      <div className="mt-4 text-xs text-neutral-500">
-        Tip: If the preview looks right, hit “Print / Save PDF” and choose “Save as PDF”.
-      </div>
+      <div className="mt-4 text-xs text-neutral-600">ToolStack • Invoice-It</div>
     </div>
   );
 }
