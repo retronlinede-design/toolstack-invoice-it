@@ -594,9 +594,9 @@ export default function InvoiceItApp() {
           <div>
             <div className="text-4xl sm:text-5xl font-black tracking-tight text-neutral-700">
               <span>Invoice</span>
-              <span className="text-lime-500">It</span>
+              <span className="text-[#D5FF00]">It</span>
             </div>
-            <div className="text-sm text-neutral-700">Clients, invoices, preview, and exports.</div>
+            <div className="text-sm text-neutral-700">Create simple invoices for your small business</div>
             <div className="mt-3 h-[2px] w-80 rounded-full bg-gradient-to-r from-lime-400/0 via-lime-400 to-emerald-400/0" />
           </div>
 
